@@ -10,7 +10,8 @@
 
 const DataManager = (() => {
     const TICKER = 'CW8.PA';
-    const CACHE_PREFIX = 'etf_cache_';
+    // v2: invalide les anciens caches (notamment les donnees demo random mises en cache)
+    const CACHE_PREFIX = 'etf_cache_v2_';
     const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 heures en millisecondes
 
     // Proxies CORS publics tentés automatiquement (ordre de priorité)
@@ -67,10 +68,9 @@ const DataManager = (() => {
             }
         }
 
-        // Secours 2: données de démonstration générées (dernier recours)
+        // Secours 2: données de démonstration générées (dernier recours, jamais mises en cache)
         console.warn('⚠ Aucune donnée live ni instantané disponible. Utilisation des données de démonstration.');
         const demoData = generateDemoData(startDate, endDate);
-        saveToCache(cacheKey, demoData);
         return { data: demoData, source: 'demo' };
     };
 
