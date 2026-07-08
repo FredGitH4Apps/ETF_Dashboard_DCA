@@ -57,8 +57,18 @@ const DataManager = (() => {
             }
         }
 
-        // Dernière tentative: générer des données démo réalistes
-        console.warn('⚠ Tous les proxies CORS ont échoué. Utilisation des données de démonstration.');
+        // Secours 1: instantané réel embarqué (data-snapshot.js) filtré sur la période
+        if (Array.isArray(window.CW8_SNAPSHOT) && window.CW8_SNAPSHOT.length) {
+            const snapshot = window.CW8_SNAPSHOT.filter(d => d.date >= startDate && d.date <= endDate);
+            if (snapshot.length) {
+                const meta = window.CW8_SNAPSHOT_META || {};
+                console.warn(`⚠ Fetch live indisponible (CORS). Utilisation de l'instantané réel embarqué (généré le ${meta.generatedAt || 'n/a'}).`);
+                return { data: snapshot, source: 'snapshot' };
+            }
+        }
+
+        // Secours 2: données de démonstration générées (dernier recours)
+        console.warn('⚠ Aucune donnée live ni instantané disponible. Utilisation des données de démonstration.');
         const demoData = generateDemoData(startDate, endDate);
         saveToCache(cacheKey, demoData);
         return { data: demoData, source: 'demo' };

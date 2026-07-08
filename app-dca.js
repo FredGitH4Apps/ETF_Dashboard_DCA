@@ -591,11 +591,12 @@ const ETFDashboard = (() => {
      */
     const updateDataSourceBadge = (source) => {
         const labels = {
-            live:   'Données Yahoo Finance en direct',
-            cached: 'Données depuis le cache (< 24h)',
-            csv:    'Données importées via CSV',
-            demo:   '📊 Données de démonstration',
-            none:   'En attente…'
+            live:     'Données Yahoo Finance en direct',
+            cached:   'Données depuis le cache (< 24h)',
+            csv:      'Données importées via CSV',
+            snapshot: '📈 Données réelles embarquées (instantané)',
+            demo:     '📊 Données de démonstration',
+            none:     'En attente…'
         };
         
         if (DOM.dataSourceBadge) {

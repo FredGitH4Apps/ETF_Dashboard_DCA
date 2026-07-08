@@ -122,6 +122,7 @@
         .data-source-badge.live .dot { background: #10b981; }
         .data-source-badge.cached .dot { background: #f0b429; }
         .data-source-badge.csv .dot { background: #6366f1; }
+        .data-source-badge.snapshot .dot { background: #10b981; }
         .data-source-badge.demo .dot { background: #8b5cf6; }
 
         /* Calendrier picker */
@@ -597,7 +598,8 @@
 
     </div><!-- /.app-container -->
 
-    <!-- Scripts (ordre requis: data → chart → dca → calendar → app) -->
+    <!-- Scripts (ordre requis: snapshot → data → chart → dca → calendar → app) -->
+    <script src="data-snapshot.js"></script>
     <script src="data.js"></script>
     <script src="chart.js"></script>
     <script src="dca.js"></script>
