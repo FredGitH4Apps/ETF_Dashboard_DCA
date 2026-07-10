@@ -30,7 +30,8 @@ const DCAModule = (() => {
         projectionInvested: null,
         projectionGain: null,
         projectionFinal: null,
-        tableBody: null
+        tableBody: null,
+        tableBodyCumul: null
     };
 
     /**
@@ -108,18 +109,12 @@ const DCAModule = (() => {
         let totalParts = 0;
         let totalInvested = 0;
         const monthsByYear = new Map();
-        const pointsByYear = new Map();
 
         for (const point of monthlySeries) {
             const boughtParts = monthlyAmount / point.close;
             totalParts += boughtParts;
             totalInvested += monthlyAmount;
             monthsByYear.set(point.year, (monthsByYear.get(point.year) || 0) + 1);
-            
-            // Stocker le dernier point de chaque année pour récupérer le prix
-            if (!pointsByYear.has(point.year) || point.date > pointsByYear.get(point.year).date) {
-                pointsByYear.set(point.year, point);
-            }
         }
 
         const finalClose = monthlySeries[monthlySeries.length - 1].close;
@@ -127,54 +122,78 @@ const DCAModule = (() => {
         const totalGainEur = portfolioValue - totalInvested;
         const totalGainPct = totalInvested > 0 ? (totalGainEur / totalInvested) * 100 : 0;
 
-        // Calcul des lignes annuelles basé sur les prix réels (cohérent avec le total)
+        // Calcul des lignes annuelles : rendement de la SEULE somme investie chaque année,
+        // valorisée au prix de fin de période, indépendamment des autres années.
+        // (La somme des gains annuels reste égale au gain total.)
         const yearlyRows = [];
-        let cumulativePartsByYear = 0;
-        let cumulativeInvestedByYear = 0;
-        let previousGain = 0;
-
         const sortedYears = Array.from(monthsByYear.keys()).sort((a, b) => a - b);
-        
+
         for (const year of sortedYears) {
             const monthCount = monthsByYear.get(year);
             const invested = monthlyAmount * monthCount;
-            cumulativeInvestedByYear += invested;
 
-            // Accumuler les parts jusqu'à fin d'année
+            // Parts achetées uniquement avec les versements de CETTE année
+            let partsThisYear = 0;
             for (const point of monthlySeries) {
                 if (point.year === year) {
-                    cumulativePartsByYear += monthlyAmount / point.close;
+                    partsThisYear += monthlyAmount / point.close;
                 }
             }
 
-            // Prix réel à la fin de cette année
-            const lastPointThisYear = pointsByYear.get(year);
-            const priceEndYear = lastPointThisYear ? lastPointThisYear.close : finalClose;
+            // Valeur actuelle de ces parts (au prix de fin de période)
+            const valueThisYear = partsThisYear * finalClose;
 
-            // Valeur cumulative du portefeuille à la fin de cette année
-            const portfolioValueCumul = cumulativePartsByYear * priceEndYear;
-
-            // Gain cumulatif à fin d'année
-            const gainCumulEur = portfolioValueCumul - cumulativeInvestedByYear;
-            const gainCumulPct = cumulativeInvestedByYear > 0 
-                ? (gainCumulEur / cumulativeInvestedByYear) * 100 
-                : 0;
-
-            // Gain GÉNÉRÉ cette année (gain cumul - gain année précédente)
-            const gainGeneratedYear = gainCumulEur - previousGain;
-            const gainGeneratedPct = cumulativeInvestedByYear > 0 
-                ? (gainGeneratedYear / monthlyAmount) * 100 
-                : 0;
+            // Gain généré par la somme investie cette année-là
+            const gainEur = valueThisYear - invested;
+            const gainPct = invested > 0 ? (gainEur / invested) * 100 : 0;
 
             yearlyRows.push({
                 year,
                 invested,
-                portfolioValue: portfolioValueCumul,
-                gainEur: gainGeneratedYear,
-                gainPct: gainGeneratedPct
+                portfolioValue: valueThisYear,
+                gainEur,
+                gainPct
             });
+        }
 
-            previousGain = gainCumulEur;
+        // Tableau 2 : gains CUMULÉS recalculés chaque année.
+        // Pour l'année Y : cumul de tous les versements et de toutes les parts
+        // (achetées mois par mois au prix de chaque mois) du début de période
+        // jusqu'à fin d'année Y, valorisées au prix de fin de période.
+        const yearlyRowsCumul = [];
+        let cumulParts = 0;
+        let cumulInvested = 0;
+
+        for (const year of sortedYears) {
+            const monthCount = monthsByYear.get(year);
+            const investedThisYear = monthlyAmount * monthCount;
+
+            // Base début d'année = valeur cumulée des parts des années précédentes
+            // (au prix de fin de période) + versements de l'année en cours. Informatif.
+            const prevCumulValue = cumulParts * finalClose;
+            const baseStartYear = prevCumulValue + investedThisYear;
+
+            cumulInvested += investedThisYear;
+
+            // Ajoute les parts de l'année (calcul exact mois par mois)
+            for (const point of monthlySeries) {
+                if (point.year === year) {
+                    cumulParts += monthlyAmount / point.close;
+                }
+            }
+
+            const cumulValue = cumulParts * finalClose;
+            const gainCumulEur = cumulValue - cumulInvested;
+            const gainCumulPct = cumulInvested > 0 ? (gainCumulEur / cumulInvested) * 100 : 0;
+
+            yearlyRowsCumul.push({
+                year,
+                invested: cumulInvested,
+                base: baseStartYear,
+                portfolioValue: cumulValue,
+                gainEur: gainCumulEur,
+                gainPct: gainCumulPct
+            });
         }
 
         return {
@@ -183,7 +202,8 @@ const DCAModule = (() => {
             portfolioValue,
             totalGainEur,
             totalGainPct,
-            yearlyRows
+            yearlyRows,
+            yearlyRowsCumul
         };
     };
 
@@ -220,24 +240,29 @@ const DCAModule = (() => {
     };
 
     /**
-     * Rend le tableau récapitulatif annuel.
+     * Rend un tableau récapitulatif annuel dans le corps de tableau cible.
      * @param {Array} yearlyRows
+     * @param {HTMLElement} targetBody
+     * @param {boolean} [includeBase] - Ajoute la colonne « Base début d'année »
      */
-    const renderTable = (yearlyRows) => {
-        if (!DOM.tableBody) {
+    const renderTable = (yearlyRows, targetBody, includeBase = false) => {
+        if (!targetBody) {
             return;
         }
 
+        const colspan = includeBase ? 6 : 5;
         if (!yearlyRows.length) {
-            DOM.tableBody.innerHTML = '<tr><td colspan="5">Aucune donnée sur la période.</td></tr>';
+            targetBody.innerHTML = `<tr><td colspan="${colspan}">Aucune donnée sur la période.</td></tr>`;
             return;
         }
 
         const rowsHtml = yearlyRows.map((row) => {
+            const baseCell = includeBase ? `<td>${formatCurrency(row.base)}</td>` : '';
             return `
                 <tr>
                     <td>${row.year}</td>
                     <td>${formatCurrency(row.invested)}</td>
+                    ${baseCell}
                     <td>${formatCurrency(row.portfolioValue)}</td>
                     <td>${formatCurrency(row.gainEur)}</td>
                     <td>${formatPercent(row.gainPct)}</td>
@@ -245,7 +270,7 @@ const DCAModule = (() => {
             `;
         }).join('');
 
-        DOM.tableBody.innerHTML = rowsHtml;
+        targetBody.innerHTML = rowsHtml;
     };
 
     /**
@@ -324,7 +349,19 @@ const DCAModule = (() => {
             state.projectionMonthly = Number(DOM.projectionMonthlyInput.value) || 0;
         }
 
-        state.periodRate = Number(window.currentPeriodReturn) || 0;
+        // Taux par défaut = MOYENNE des rendements annuels de la période sélectionnée
+        // (ex: 2024=26%, 2025=30%, 2026=8% → 21,33%). Repli sur le rendement global si indispo.
+        const yearlyReturns = window.currentPeriodReturnPerYear || {};
+        const yearlyValues = Object.values(yearlyReturns)
+            .map((v) => Number(v))
+            .filter((v) => Number.isFinite(v));
+        if (yearlyValues.length > 0) {
+            const sum = yearlyValues.reduce((acc, v) => acc + v, 0);
+            state.periodRate = sum / yearlyValues.length;
+        } else {
+            state.periodRate = Number(window.currentPeriodReturn) || 0;
+        }
+
         if (!state.userOverrideRate && DOM.projectionRateInput) {
             state.projectionRate = state.periodRate;
             DOM.projectionRateInput.value = state.periodRate.toFixed(2);
@@ -333,7 +370,7 @@ const DCAModule = (() => {
         }
 
         if (DOM.projectionRateHint) {
-            DOM.projectionRateHint.textContent = `Taux basé sur la période sélectionnée: ${state.periodRate.toFixed(2)}%`;
+            DOM.projectionRateHint.textContent = `Moyenne des rendements annuels de la période: ${state.periodRate.toFixed(2)}%`;
         }
 
         const monthlySeries = getMonthlySeries(state.data || []);
@@ -370,7 +407,8 @@ const DCAModule = (() => {
             DOM.projectionFinal.textContent = formatCurrency(projection.portfolioFinal);
         }
 
-        renderTable(retro.yearlyRows);
+        renderTable(retro.yearlyRows, DOM.tableBody);
+        renderTable(retro.yearlyRowsCumul, DOM.tableBodyCumul, true);
         renderDebug(retro, projection, monthlySeries.length);
     };
 
@@ -392,6 +430,7 @@ const DCAModule = (() => {
         DOM.projectionGain = document.getElementById('dca-projection-gain');
         DOM.projectionFinal = document.getElementById('dca-projection-final');
         DOM.tableBody = document.getElementById('dca-yearly-body');
+        DOM.tableBodyCumul = document.getElementById('dca-yearly-cumul-body');
 
         if (!DOM.monthlyAmountInput || !DOM.projectionYearsInput || !DOM.projectionMonthlyInput || !DOM.projectionRateInput) {
             return false;
@@ -421,7 +460,7 @@ const DCAModule = (() => {
         if (DOM.projectionResetRateBtn) {
             DOM.projectionResetRateBtn.addEventListener('click', () => {
                 state.userOverrideRate = false;
-                DOM.projectionRateInput.value = (Number(window.currentPeriodReturn) || 0).toFixed(2);
+                // calculate() recalcule la moyenne des rendements annuels et met à jour le champ
                 calculate();
             });
         }

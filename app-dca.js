@@ -18,7 +18,9 @@ const ETFDashboard = (() => {
         startDate: null,
         endDate: null,
         isLoading: false,
-        dataSource: 'none'
+        dataSource: 'none',
+        dataMinDate: null, // première date disponible dans les données
+        dataMaxDate: null  // dernière date disponible dans les données
     };
     window.currentPeriodReturn = 0;
     window.currentPeriodReturnPerYear = {};
@@ -120,30 +122,33 @@ const ETFDashboard = (() => {
         
         // Attache les evenements
         attachEventListeners();
+
+        // Active le redimensionnement / mode flottant du volet DCA
+        setupPanelResize();
         
         // Charge les donnees initiales
         await loadInitialData();
     };
     
     /**
-     * Configure la plage de dates par défaut (1 an depuis aujourd'hui)
+     * Configure la plage de dates par défaut (01/01/2024 → aujourd'hui)
      * @private
      */
     const setDefaultDateRange = () => {
         console.log('⚙️ Configuration de la plage de dates par défaut...');
         const today = new Date();
         const todayIso = formatDateForInput(today);
-        const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
-        
+        const forcedStart = new Date(2024, 0, 1); // 01/01/2024 imposé
+
         state.endDate = formatDateForInput(today);
-        state.startDate = formatDateForInput(oneYearAgo);
-        
-        console.log(`📅 Dates: ${formatDateDisplay(oneYearAgo)} → ${formatDateDisplay(today)}`);
-        
+        state.startDate = formatDateForInput(forcedStart);
+
+        console.log(`📅 Dates: ${formatDateDisplay(forcedStart)} → ${formatDateDisplay(today)}`);
+
         // Affiche au format JJ/MM/AAAA dans l'interface (avec vérification)
         if (DOM.startDateInput) {
             DOM.startDateInput.setAttribute('max', todayIso);
-            DOM.startDateInput.value = formatDateDisplay(oneYearAgo);
+            DOM.startDateInput.value = formatDateDisplay(forcedStart);
             console.log('✅ Date de début appliquée:', DOM.startDateInput.value);
         } else {
             console.error('❌ DOM.startDateInput est null/undefined');
@@ -215,6 +220,69 @@ const ETFDashboard = (() => {
         
         console.log('✅ Event listeners attachés');
     };
+
+    /**
+     * Active le redimensionnement du volet DCA (glisser la poignée gauche)
+     * et le bouton de bascule en mode flottant (superposé, page visible derrière).
+     * @private
+     */
+    const setupPanelResize = () => {
+        const panel = document.querySelector('.dca-panel');
+        if (!panel) return;
+        const handle = document.getElementById('dca-resize-handle');
+        const expandBtn = document.getElementById('dca-expand-btn');
+
+        const MIN_W = 300;
+        const maxW = () => Math.min(window.innerWidth * 0.95, 1100);
+
+        let dragging = false;
+        const onMove = (e) => {
+            if (!dragging) return;
+            const rect = panel.getBoundingClientRect();
+            // La poignée est à gauche ; le bord droit du volet reste fixe.
+            let w = rect.right - e.clientX;
+            w = Math.max(MIN_W, Math.min(maxW(), w));
+            panel.style.setProperty('--dca-panel-width', `${Math.round(w)}px`);
+            e.preventDefault();
+        };
+        const stop = () => {
+            dragging = false;
+            document.body.style.userSelect = '';
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', stop);
+        };
+        if (handle) {
+            handle.addEventListener('pointerdown', (e) => {
+                dragging = true;
+                document.body.style.userSelect = 'none';
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', stop);
+                e.preventDefault();
+            });
+        }
+
+        if (expandBtn) {
+            expandBtn.addEventListener('click', () => {
+                const floating = panel.classList.toggle('floating');
+                if (floating) {
+                    const cur = parseInt(
+                        getComputedStyle(panel).getPropertyValue('--dca-panel-width'),
+                        10
+                    ) || 320;
+                    if (cur < 520) {
+                        panel.style.setProperty('--dca-panel-width', '560px');
+                    }
+                    expandBtn.textContent = '⤡';
+                    expandBtn.title = 'Réduire le volet';
+                } else {
+                    expandBtn.textContent = '⤢';
+                    expandBtn.title = 'Agrandir le volet (mode flottant)';
+                }
+            });
+        }
+
+        console.log('✅ Redimensionnement du volet DCA activé');
+    };
     
     /**
      * Gestionnaire: Appliquer la nouvelle plage de dates
@@ -244,6 +312,20 @@ const ETFDashboard = (() => {
             endDate = todayIso;
             if (DOM.endDateInput) {
                 DOM.endDateInput.value = formatDateDisplay(new Date(`${todayIso}T00:00:00`));
+            }
+        }
+
+        // Contraint la sélection à la plage de données disponible
+        if (state.dataMinDate && startDate < state.dataMinDate) {
+            startDate = state.dataMinDate;
+            if (DOM.startDateInput) {
+                DOM.startDateInput.value = formatDateDisplay(new Date(`${startDate}T00:00:00`));
+            }
+        }
+        if (state.dataMaxDate && endDate > state.dataMaxDate) {
+            endDate = state.dataMaxDate;
+            if (DOM.endDateInput) {
+                DOM.endDateInput.value = formatDateDisplay(new Date(`${endDate}T00:00:00`));
             }
         }
         
@@ -310,7 +392,10 @@ const ETFDashboard = (() => {
                     DOM.startDateInput.value = formatDateDisplay(new Date(`${state.startDate}T00:00:00`));
                     DOM.endDateInput.value = formatDateDisplay(new Date(`${state.endDate}T00:00:00`));
                 }
-                
+
+                // Met à jour les bornes du calendrier selon les données CSV
+                applyDataBounds();
+
                 filterAndUpdate();
             } catch (error) {
                 showError('Erreur lors du parsing du CSV: ' + error.message);
@@ -319,6 +404,44 @@ const ETFDashboard = (() => {
         reader.readAsText(file);
     };
     
+    /**
+     * Calcule les bornes de dates disponibles depuis state.rawData,
+     * clampe la vue par défaut dans ces bornes et les transmet au calendrier.
+     * @private
+     */
+    const applyDataBounds = () => {
+        if (!state.rawData || state.rawData.length === 0) return;
+
+        let min = state.rawData[0].date;
+        let max = state.rawData[0].date;
+        for (const row of state.rawData) {
+            if (row.date < min) min = row.date;
+            if (row.date > max) max = row.date;
+        }
+        state.dataMinDate = min;
+        state.dataMaxDate = max;
+
+        // Clampe la vue par défaut dans les bornes disponibles
+        if (!state.startDate || state.startDate < min) state.startDate = min;
+        if (!state.endDate || state.endDate > max) state.endDate = max;
+        if (state.startDate >= state.endDate) state.startDate = min;
+
+        // Met à jour l'affichage des champs
+        if (DOM.startDateInput) {
+            DOM.startDateInput.value = formatDateDisplay(new Date(`${state.startDate}T00:00:00`));
+        }
+        if (DOM.endDateInput) {
+            DOM.endDateInput.value = formatDateDisplay(new Date(`${state.endDate}T00:00:00`));
+        }
+
+        // Transmet les bornes au calendrier
+        if (typeof CalendarPicker !== 'undefined' && CalendarPicker.setBounds) {
+            CalendarPicker.setBounds(min, max);
+        }
+
+        console.log(`📅 Plage de données disponible: ${min} → ${max}`);
+    };
+
     /**
      * Charge les données initiales depuis Yahoo Finance ou le cache
      * @private
@@ -329,13 +452,18 @@ const ETFDashboard = (() => {
         showLoading('Récupération des données CW8.PA via Yahoo Finance…');
         
         try {
-            console.log(`🔄 Requête: ${state.startDate} → ${state.endDate}`);
-            const result = await DataManager.fetchData(state.startDate, state.endDate);
+            // Charge TOUTE la plage disponible pour connaître les vraies bornes ;
+            // par défaut on n'affichera que la dernière année.
+            const fullStartIso = '2000-01-01';
+            const todayIso = formatDateForInput(new Date());
+            console.log(`🔄 Requête (plage complète): ${fullStartIso} → ${todayIso}`);
+            const result = await DataManager.fetchData(fullStartIso, todayIso);
             console.log(`✅ Données reçues (${result.data.length} points, source: ${result.source})`);
             
             state.rawData = result.data;
             state.dataSource = result.source || 'live';
             updateDataSourceBadge(state.dataSource);
+            applyDataBounds();
             hideError();
             filterAndUpdate();
         } catch (error) {
@@ -608,9 +736,50 @@ const ETFDashboard = (() => {
         
         console.log(`📊 Source de données: ${labels[source]}`);
     };
+
+    /**
+     * Remplace les données du dashboard par une série de portefeuille composite
+     * puis recalcule tout (bornes, graphique, KPIs, DCA).
+     * @param {Array} rows - série OHLC composite triée par date croissante
+     * @param {string} [label] - libellé affiché comme source de données
+     * @returns {{clamped: boolean, min: string, max: string}}
+     */
+    const applyPortfolioSeries = (rows, label = 'Portefeuille personnalisé') => {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            showError('Portefeuille vide ou invalide');
+            return { clamped: false, min: null, max: null };
+        }
+
+        const prevStart = state.startDate;
+        state.rawData = rows;
+        state.dataSource = 'portfolio';
+
+        applyDataBounds(); // recale les bornes du calendrier et clampe la vue
+
+        // Indique si la période de début a dû être resserrée (couverture insuffisante)
+        const clamped = prevStart && state.startDate && prevStart < state.startDate;
+
+        if (DOM.dataSourceLabel) {
+            DOM.dataSourceLabel.textContent = label;
+        }
+        if (DOM.dataSourceBadge) {
+            DOM.dataSourceBadge.className = 'data-source-badge live';
+        }
+
+        filterAndUpdate();
+        return { clamped, min: state.dataMinDate, max: state.dataMaxDate };
+    };
+
+    /**
+     * Retourne la période actuellement sélectionnée.
+     * @returns {{startDate: string, endDate: string}}
+     */
+    const getPeriod = () => ({ startDate: state.startDate, endDate: state.endDate });
     
     return {
-        init
+        init,
+        applyPortfolioSeries,
+        getPeriod
     };
 })();
 

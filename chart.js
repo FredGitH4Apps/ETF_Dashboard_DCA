@@ -10,7 +10,114 @@
 
 const ChartManager = (() => {
     let chartInstance = null;
-    
+    let chartDates = []; // dates ISO alignées sur les points du graphique (pour l'axe X hiérarchique)
+    let xTickLabels = []; // label pré-calculé par point (string | [ligne1, ligne2] | '')
+    let yearBoundaryIndices = []; // indices marquant un changement d'année (séparateurs)
+
+    const MONTHS_FULL = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    const MONTHS_SHORT = [
+        'Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin',
+        'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'
+    ];
+
+    /**
+     * Plugin : dessine un séparateur vertical discret au changement d'année.
+     */
+    const yearSeparatorPlugin = {
+        id: 'yearSeparators',
+        afterDraw(chart) {
+            if (!yearBoundaryIndices || yearBoundaryIndices.length === 0) return;
+            const xScale = chart.scales.x;
+            const yScale = chart.scales.y;
+            if (!xScale || !yScale) return;
+
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(240, 180, 41, 0.22)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            for (const idx of yearBoundaryIndices) {
+                const x = xScale.getPixelForValue(idx);
+                if (x === undefined || Number.isNaN(x)) continue;
+                ctx.beginPath();
+                ctx.moveTo(x, yScale.top);
+                ctx.lineTo(x, yScale.bottom);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+    };
+
+    /**
+     * Calcule dynamiquement les labels de l'axe X selon l'étendue temporelle.
+     * - Courte période (≤ 18 mois) : mois en toutes lettres + année
+     * - Moyenne (≤ 36 mois) : mois abrégés + année
+     * - Longue (≤ 96 mois) : trimestres (janv/avr/juil/oct) + année
+     * - Très longue (> 96 mois) : janvier de chaque année
+     * L'année reste toujours visible (2e ligne au changement d'année).
+     * @param {Array} data - Données OHLCV filtrées (triées par date croissante)
+     * @private
+     */
+    const computeXAxis = (data) => {
+        xTickLabels = new Array(data.length).fill('');
+        yearBoundaryIndices = [];
+        if (!data.length) return;
+
+        const firstDate = new Date(`${data[0].date}T00:00:00`);
+        const lastDate = new Date(`${data[data.length - 1].date}T00:00:00`);
+        const spanMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12
+            + (lastDate.getMonth() - firstDate.getMonth());
+
+        // Choisit la stratégie de densité
+        let monthFilter; // (monthIndex) => bool : quels débuts de mois on étiquette
+        let useFullMonth;
+        if (spanMonths <= 18) {
+            monthFilter = () => true;          // chaque mois
+            useFullMonth = true;               // en toutes lettres
+        } else if (spanMonths <= 36) {
+            monthFilter = () => true;          // chaque mois
+            useFullMonth = false;              // abrégé
+        } else if (spanMonths <= 96) {
+            monthFilter = (m) => m % 3 === 0;  // trimestres
+            useFullMonth = false;
+        } else {
+            monthFilter = (m) => m === 0;      // janvier seulement
+            useFullMonth = false;
+        }
+
+        let prevMonth = null;
+        let prevYear = null;
+        for (let i = 0; i < data.length; i += 1) {
+            const d = new Date(`${data[i].date}T00:00:00`);
+            const month = d.getMonth();
+            const year = d.getFullYear();
+
+            const isMonthStart = month !== prevMonth || year !== prevYear;
+
+            if (year !== prevYear && prevYear !== null) {
+                yearBoundaryIndices.push(i);
+            }
+
+            if (isMonthStart && monthFilter(month)) {
+                const name = useFullMonth ? MONTHS_FULL[month] : MONTHS_SHORT[month];
+                // Année sur une 2e ligne au 1er label d'une nouvelle année
+                xTickLabels[i] = (year !== prevYear) ? [name, String(year)] : name;
+            }
+
+            prevMonth = month;
+            prevYear = year;
+        }
+
+        // Garantit qu'au moins la première année soit visible
+        if (xTickLabels[0] === '') {
+            const name0 = useFullMonth ? MONTHS_FULL[firstDate.getMonth()] : MONTHS_SHORT[firstDate.getMonth()];
+            xTickLabels[0] = [name0, String(firstDate.getFullYear())];
+        }
+    };
+
     /**
      * Initialise le graphique Chart.js
      * @param {string} canvasId - ID du canvas HTML
@@ -21,6 +128,7 @@ const ChartManager = (() => {
         
         chartInstance = new Chart(ctx, {
             type: 'line',
+            plugins: [yearSeparatorPlugin],
             data: {
                 labels: [],
                 datasets: [{
@@ -68,6 +176,16 @@ const ChartManager = (() => {
                         padding: 12,
                         displayColors: false,
                         callbacks: {
+                            // Titre de l'infobulle : date complète (jour mois année)
+                            title: function(items) {
+                                if (!items.length) return '';
+                                const iso = chartDates[items[0].dataIndex];
+                                if (!iso) return '';
+                                const d = new Date(`${iso}T00:00:00`);
+                                return d.toLocaleDateString('fr-FR', {
+                                    day: '2-digit', month: 'long', year: 'numeric'
+                                });
+                            },
                             // Personnalise le contenu du tooltip
                             label: function(context) {
                                 let label = '';
@@ -93,16 +211,22 @@ const ChartManager = (() => {
                     x: {
                         display: true,
                         grid: {
-                            color: 'rgba(42, 42, 42, 0.3)',
-                            drawBorder: false
+                            drawOnChartArea: false,
+                            drawBorder: false,
+                            tickLength: 0
                         },
                         ticks: {
                             color: '#b0b0b0',
                             font: {
                                 size: 11
                             },
-                            maxRotation: 45,
-                            minRotation: 0
+                            maxRotation: 0,
+                            minRotation: 0,
+                            autoSkip: false,
+                            // Labels pré-calculés dynamiquement selon l'échelle (voir computeXAxis)
+                            callback: function(value, index) {
+                                return xTickLabels[index] !== undefined ? xTickLabels[index] : '';
+                            }
                         }
                     },
                     y: {
@@ -150,6 +274,8 @@ const ChartManager = (() => {
         // Extrait les dates et prix de clôture
         const labels = data.map(d => formatDateForChart(d.date));
         const prices = data.map(d => d.close);
+        chartDates = data.map(d => d.date); // conserve les dates ISO pour l'axe hiérarchique
+        computeXAxis(data); // calcule les labels dynamiques et les séparateurs d'année
         
         // Met à jour les données du graphique
         chartInstance.data.labels = labels;

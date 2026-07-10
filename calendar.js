@@ -13,6 +13,8 @@ const CalendarPicker = (() => {
     let currentDate = new Date();
     let selectedDate = null;
     let activeField = null; // 'start' ou 'end'
+    let minDate = null; // borne min sélectionnable (plage de données disponible)
+    let maxDate = null; // borne max sélectionnable (plage de données disponible)
     
     // Éléments DOM
     let elements = {};
@@ -108,8 +110,8 @@ const CalendarPicker = (() => {
         
         try {
             const currentYear = currentDate.getFullYear();
-            const startYear = currentYear - 30;
-            const endYear = currentYear + 30;
+            const startYear = minDate ? minDate.getFullYear() : currentYear - 30;
+            const endYear = maxDate ? maxDate.getFullYear() : currentYear + 30;
 
             elements.yearSelect.innerHTML = '';
             for (let year = startYear; year <= endYear; year++) {
@@ -166,6 +168,10 @@ const CalendarPicker = (() => {
                 selectedDate = null;
                 currentDate = new Date();
             }
+
+            // Recentre sur les bornes disponibles si le mois courant est hors plage
+            if (minDate && currentDate < minDate) currentDate = new Date(minDate);
+            if (maxDate && currentDate > maxDate) currentDate = new Date(maxDate);
 
             initMonthSelector();
             initYearSelector();
@@ -318,6 +324,10 @@ const CalendarPicker = (() => {
             if (isOtherMonth) {
                 dayEl.classList.add('other-month');
                 dayEl.disabled = true;
+            } else if (isOutOfRange(dateObj)) {
+                // Jour hors de la plage de données disponible : non sélectionnable
+                dayEl.classList.add('out-of-range');
+                dayEl.disabled = true;
             } else {
                 // Vérifie si c'est aujourd'hui
                 const today = new Date();
@@ -398,7 +408,34 @@ const CalendarPicker = (() => {
         );
     };
 
+    /**
+     * Définit les bornes sélectionnables (plage de données disponible).
+     * @param {string} minIso - Date min au format YYYY-MM-DD
+     * @param {string} maxIso - Date max au format YYYY-MM-DD
+     */
+    const setBounds = (minIso, maxIso) => {
+        minDate = minIso ? new Date(`${minIso}T00:00:00`) : null;
+        maxDate = maxIso ? new Date(`${maxIso}T00:00:00`) : null;
+    };
+
+    /**
+     * Indique si une date est hors de la plage de données disponible.
+     */
+    const isOutOfRange = (dateObj) => {
+        const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+        if (minDate) {
+            const min = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+            if (d < min) return true;
+        }
+        if (maxDate) {
+            const max = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+            if (d > max) return true;
+        }
+        return false;
+    };
+
     return {
-        init
+        init,
+        setBounds
     };
 })();

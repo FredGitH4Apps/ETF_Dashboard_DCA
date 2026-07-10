@@ -304,6 +304,13 @@
             border-color: #f0b429;
             font-weight: 600;
         }
+        .calendar-day.out-of-range {
+            color: #3a3a3a;
+            cursor: not-allowed;
+            text-decoration: line-through;
+            opacity: 0.5;
+            pointer-events: none;
+        }
 
         .calendar-actions {
             display: flex;
@@ -461,6 +468,28 @@
         </div>
 
         <div class="dashboard-layout">
+            <aside class="portfolio-panel" id="portfolio-panel" aria-label="Éditeur de portefeuille">
+                <button type="button" class="portfolio-toggle" id="portfolio-toggle" aria-expanded="true" aria-controls="portfolio-body">
+                    <span class="portfolio-toggle-icon">📁</span>
+                    <span class="portfolio-toggle-text">Portefeuille</span>
+                    <span class="portfolio-toggle-caret">◀</span>
+                </button>
+                <div class="portfolio-body" id="portfolio-body">
+                    <h2 class="portfolio-title">Éditer le portefeuille</h2>
+                    <p class="portfolio-hint">Composez jusqu'à 10 ETF. La somme des pourcentages fait toujours 100%.</p>
+                    <div id="portfolio-rows" class="portfolio-rows"></div>
+                    <div id="portfolio-add" class="portfolio-add"></div>
+                    <div class="portfolio-chart-wrap">
+                        <canvas id="portfolio-pie" role="img" aria-label="Répartition du portefeuille"></canvas>
+                    </div>
+                    <div id="portfolio-warning" class="portfolio-warning" aria-live="polite"></div>
+                    <div class="portfolio-actions">
+                        <button type="button" id="portfolio-confirm" class="portfolio-confirm">Confirmer</button>
+                        <button type="button" id="portfolio-reset" class="portfolio-reset">Réinitialiser</button>
+                    </div>
+                </div>
+            </aside>
+
             <main class="dashboard-main" aria-label="Zone principale du dashboard ETF">
                 <!-- Panneau KPI (Indicateurs clés de performance) -->
                 <section class="kpi-panel" aria-label="Indicateurs clés">
@@ -511,6 +540,8 @@
             </main>
 
             <aside class="dca-panel" aria-label="Module DCA">
+                <div class="dca-resize-handle" id="dca-resize-handle" title="Glisser pour redimensionner le volet"></div>
+                <button type="button" id="dca-expand-btn" class="dca-expand-btn" title="Agrandir le volet (mode flottant)" aria-label="Agrandir ou réduire le volet">⤢</button>
                 <section class="dca-section" aria-labelledby="dca-retro-title">
                     <h2 id="dca-retro-title">📊 Rétroviseur</h2>
                     <p class="dca-section-hint">Le rendement DCA est naturellement inférieur au buy-and-hold sur un marché haussier&nbsp;: vos versements sont étalés dans le temps.</p>
@@ -537,18 +568,36 @@
                         <div class="kpi-unit">si tout avait été investi au 1<sup>er</sup> jour</div>
                     </div>
 
-                    <div class="dca-table-wrapper" aria-label="Tableau annuel du rétroviseur DCA">
+                    <div class="dca-table-wrapper" aria-label="Tableau annuel des gains non cumulés">
+                        <div class="dca-table-title">Gains par année (non cumulés)</div>
                         <table class="dca-table">
                             <thead>
                                 <tr>
                                     <th>Année</th>
                                     <th>Investi (€)</th>
-                                    <th>Valeur portefeuille (€)</th>
+                                    <th>Valeur fin de période (€)</th>
                                     <th>Gain (€)</th>
                                     <th>Gain (%)</th>
                                 </tr>
                             </thead>
                             <tbody id="dca-yearly-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="dca-table-wrapper" aria-label="Tableau annuel des gains cumulés">
+                        <div class="dca-table-title">Gains cumulés (recalculés chaque année)</div>
+                        <table class="dca-table">
+                            <thead>
+                                <tr>
+                                    <th>Année</th>
+                                    <th>Investi Total sur période (€)</th>
+                                    <th>Base début d'année (€)</th>
+                                    <th>Valeur fin de période cumulée (€)</th>
+                                    <th>Gain cumulés (€)</th>
+                                    <th>Gain cumulés (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dca-yearly-cumul-body"></tbody>
                         </table>
                     </div>
                 </section>
@@ -605,5 +654,6 @@
     <script src="dca.js"></script>
     <script src="calendar.js"></script>
     <script src="app-dca.js"></script>
+    <script src="portfolio.js"></script>
 </body>
 </html>
