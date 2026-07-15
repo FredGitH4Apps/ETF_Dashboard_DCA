@@ -362,6 +362,12 @@ const PortfolioModule = (() => {
         if (DOM.confirm) DOM.confirm.addEventListener('click', confirm);
         if (DOM.reset) DOM.reset.addEventListener('click', resetDefault);
 
+        // Sur mobile, replier le volet portefeuille par défaut
+        if (window.matchMedia('(max-width: 1200px)').matches) {
+            DOM.panel.classList.add('collapsed');
+            if (DOM.toggle) DOM.toggle.setAttribute('aria-expanded', 'false');
+        }
+
         // Portefeuille initial : CW8 à 100%
         resetDefault();
         console.log('✅ Module Portefeuille initialisé');

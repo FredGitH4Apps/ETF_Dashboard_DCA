@@ -1,0 +1,25 @@
+{
+  "name": "ETF Dashboard DCA",
+  "short_name": "ETF Dashboard",
+  "description": "Suivi ETF, portefeuille multi-ETF, DCA (rétroviseur + projection).",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

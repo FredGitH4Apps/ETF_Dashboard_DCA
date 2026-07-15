@@ -125,6 +125,9 @@ const ETFDashboard = (() => {
 
         // Active le redimensionnement / mode flottant du volet DCA
         setupPanelResize();
+
+        // Repli des volets par défaut sur mobile
+        setupMobilePanels();
         
         // Charge les donnees initiales
         await loadInitialData();
@@ -282,6 +285,27 @@ const ETFDashboard = (() => {
         }
 
         console.log('✅ Redimensionnement du volet DCA activé');
+    };
+
+    /**
+     * Sur mobile, replie le volet DCA par défaut et câble son bouton de bascule.
+     * @private
+     */
+    const setupMobilePanels = () => {
+        const dcaPanel = document.querySelector('.dca-panel');
+        const dcaToggle = document.getElementById('dca-mobile-toggle');
+        const isMobile = window.matchMedia('(max-width: 1200px)').matches;
+
+        if (dcaPanel && isMobile) {
+            dcaPanel.classList.add('mobile-collapsed');
+        }
+        if (dcaToggle && dcaPanel) {
+            dcaToggle.setAttribute('aria-expanded', String(!isMobile));
+            dcaToggle.addEventListener('click', () => {
+                const collapsed = dcaPanel.classList.toggle('mobile-collapsed');
+                dcaToggle.setAttribute('aria-expanded', String(!collapsed));
+            });
+        }
     };
     
     /**

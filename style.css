@@ -931,3 +931,132 @@ select:focus-visible {
 .portfolio-reset:hover {
     background: rgba(255, 255, 255, 0.04);
 }
+
+/* ================================================= */
+/* Responsive mobile (regroupé en fin de fichier     */
+/* pour prévaloir sur les styles de base)            */
+/* ================================================= */
+
+/* Bouton de repli du volet DCA (visible uniquement sur mobile) */
+.dca-mobile-toggle {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, #d99a10 100%);
+    color: #0d0d0d;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+}
+.dca-mobile-toggle-caret {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+}
+.dca-panel.mobile-collapsed .dca-mobile-toggle-caret {
+    transform: rotate(-90deg);
+}
+
+@media (max-width: 1200px) {
+    .dashboard-layout {
+        flex-direction: column;
+    }
+
+    /* Volets pleine largeur, empilés verticalement */
+    .portfolio-panel,
+    .portfolio-panel.collapsed,
+    .dca-panel,
+    .dca-panel.floating {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        position: static;
+        height: auto;
+        overflow: visible;
+        box-shadow: none;
+    }
+
+    /* Portefeuille : garder le libellé du bouton visible même replié */
+    .portfolio-panel.collapsed .portfolio-toggle-text {
+        display: inline;
+    }
+    .portfolio-panel.collapsed .portfolio-toggle-caret {
+        transform: rotate(-90deg);
+    }
+
+    /* DCA : bouton de repli mobile visible ; poignée/flottant masqués */
+    .dca-mobile-toggle {
+        display: flex;
+    }
+    .dca-resize-handle,
+    .dca-expand-btn {
+        display: none;
+    }
+    .dca-panel.mobile-collapsed > *:not(.dca-mobile-toggle) {
+        display: none;
+    }
+
+    .chart-container {
+        height: 320px;
+    }
+
+    /* Cibles tactiles plus grandes (>= 44px) */
+    .date-input-field,
+    .date-input-btn,
+    .btn-primary,
+    .btn-refresh,
+    .pf-add-select,
+    .portfolio-confirm,
+    .portfolio-reset,
+    .apply-dates-btn {
+        min-height: 44px;
+    }
+    .pf-weight-input {
+        min-height: 40px;
+    }
+}
+
+/* Téléphone en paysage : profiter de la largeur */
+@media (max-width: 900px) and (orientation: landscape) {
+    .kpi-panel {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .chart-container {
+        height: 260px;
+    }
+}
+
+/* Téléphone portrait */
+@media (max-width: 600px) {
+    .kpi-panel {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .chart-container {
+        height: 260px;
+    }
+    .portfolio-chart-wrap {
+        height: 200px;
+    }
+    .dca-table {
+        font-size: 11px;
+    }
+    .kpi-value {
+        font-size: 20px;
+    }
+}
+
+/* Petit téléphone */
+@media (max-width: 400px) {
+    .kpi-panel {
+        grid-template-columns: 1fr;
+    }
+    .chart-container {
+        height: 220px;
+    }
+}

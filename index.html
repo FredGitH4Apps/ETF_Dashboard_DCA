@@ -2,9 +2,20 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="ETF Dashboard MVP - Suivi en temps réel de CW8.PA (MSCI World) via Yahoo Finance">
     <title>ETF Dashboard DCA — CW8.PA (MSCI World)</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d0d0d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ETF Dashboard">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
     <link rel="stylesheet" href="style.css">
     <style>
         /* ---- Styles spécifiques à l'overlay de chargement et CORS ---- */
@@ -540,6 +551,10 @@
             </main>
 
             <aside class="dca-panel" aria-label="Module DCA">
+                <button type="button" class="dca-mobile-toggle" id="dca-mobile-toggle" aria-expanded="true">
+                    <span class="dca-mobile-toggle-text">📊 Rétroviseur &amp; Projection</span>
+                    <span class="dca-mobile-toggle-caret">▼</span>
+                </button>
                 <div class="dca-resize-handle" id="dca-resize-handle" title="Glisser pour redimensionner le volet"></div>
                 <button type="button" id="dca-expand-btn" class="dca-expand-btn" title="Agrandir le volet (mode flottant)" aria-label="Agrandir ou réduire le volet">⤢</button>
                 <section class="dca-section" aria-labelledby="dca-retro-title">
@@ -655,5 +670,16 @@
     <script src="calendar.js"></script>
     <script src="app-dca.js"></script>
     <script src="portfolio.js"></script>
+
+    <!-- PWA: enregistrement du service worker (HTTPS/localhost uniquement) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.warn('Service worker non enregistré:', err.message);
+                });
+            });
+        }
+    </script>
 </body>
 </html>
