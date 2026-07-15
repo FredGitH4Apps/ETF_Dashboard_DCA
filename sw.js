@@ -5,7 +5,7 @@
  * Bump CACHE_VERSION à chaque déploiement pour rafraîchir les fichiers.
  */
 
-const CACHE_VERSION = 'etf-dashboard-v4';
+const CACHE_VERSION = 'etf-dashboard-v5';
 const APP_SHELL = [
     './',
     './index.html',
@@ -40,12 +40,26 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;
 
-    // Ne pas mettre en cache les appels réseau vers Yahoo/proxies (données live)
     const url = new URL(request.url);
-    if (url.origin !== self.location.origin) {
-        return; // laisse passer les requêtes tierces (fetch live)
+    // Laisse passer les requêtes tierces (Yahoo/proxies, données live)
+    if (url.origin !== self.location.origin) return;
+
+    const accept = request.headers.get('accept') || '';
+    const isNavigation = request.mode === 'navigate' || accept.includes('text/html');
+
+    if (isNavigation) {
+        // HTML : network-first (toujours la dernière version si en ligne), repli cache
+        event.respondWith(
+            fetch(request).then((response) => {
+                const copy = response.clone();
+                caches.open(CACHE_VERSION).then((c) => c.put(request, copy)).catch(() => {});
+                return response;
+            }).catch(() => caches.match(request).then((c) => c || caches.match('./index.html')))
+        );
+        return;
     }
 
+    // Autres ressources same-origin : cache-first (rafraîchies au bump de version)
     event.respondWith(
         caches.match(request).then((cached) => {
             if (cached) return cached;

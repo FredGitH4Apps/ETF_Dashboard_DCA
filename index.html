@@ -677,10 +677,25 @@
     <!-- PWA: enregistrement du service worker (HTTPS/localhost uniquement) -->
     <script>
         if ('serviceWorker' in navigator) {
+            let hadController = !!navigator.serviceWorker.controller;
+
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch((err) => {
+                navigator.serviceWorker.register('sw.js').then((reg) => {
+                    // Vérifie les mises à jour à chaque lancement
+                    reg.update().catch(() => {});
+                }).catch((err) => {
                     console.warn('Service worker non enregistré:', err.message);
                 });
+            });
+
+            // Quand une nouvelle version prend le contrôle : recharge une fois
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                // Évite un reload inutile lors de la toute première installation
+                if (!hadController) { hadController = true; return; }
+                refreshing = true;
+                window.location.reload();
             });
         }
 
