@@ -8,7 +8,7 @@ const DCAModule = (() => {
         data: [],
         startDate: null,
         endDate: null,
-        monthlyAmount: 300,
+        monthlyAmount: 1100,
         projectionYears: 10,
         projectionMonthly: 300,
         projectionRate: 0,

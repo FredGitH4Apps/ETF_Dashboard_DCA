@@ -306,6 +306,16 @@ body {
     box-shadow: var(--shadow);
 }
 
+.chart-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.chart-detail-btn {
+    min-width: 220px;
+}
+
 .chart-container {
     position: relative;
     width: 100%;
@@ -700,9 +710,12 @@ select:focus-visible {
     position: sticky;
     top: var(--spacing-md);
     height: calc(100vh - (var(--spacing-md) * 2));
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+    align-self: flex-start;
+    padding-right: 4px;
     transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease;
 }
 
@@ -710,6 +723,13 @@ select:focus-visible {
     width: 52px;
     min-width: 52px;
     max-width: 52px;
+    overflow: hidden;
+}
+
+.portfolio-panel.collapsed .portfolio-toggle {
+    height: 100%;
+    min-height: calc(100vh - (var(--spacing-md) * 2));
+    justify-content: center;
 }
 
 /* Gros bouton bien visible */
@@ -1111,6 +1131,9 @@ select:focus-visible {
         min-width: 48px;
         max-width: 48px;
         overflow: hidden;
+        position: sticky;
+        top: var(--spacing-md);
+        height: calc(100vh - (var(--spacing-md) * 2));
     }
     /* Bouton compact vertical pleine hauteur quand le volet est replié */
     .portfolio-panel.collapsed .portfolio-toggle {

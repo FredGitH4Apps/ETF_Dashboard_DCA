@@ -541,6 +541,11 @@
 
                 <!-- Graphique Chart.js -->
                 <section class="chart-section" aria-label="Graphique du prix de clôture">
+                    <div class="chart-toolbar">
+                        <button type="button" id="toggle-etf-details" class="btn-primary chart-detail-btn" aria-pressed="false">
+                            Afficher les courbes ETF
+                        </button>
+                    </div>
                     <div class="chart-container">
                         <canvas id="price-chart" role="img" aria-label="Graphique linéaire du prix de clôture CW8.PA"></canvas>
                     </div>
@@ -566,7 +571,7 @@
 
                     <div class="dca-input-group">
                         <label for="dca-monthly-amount">Montant mensuel (€)</label>
-                        <input id="dca-monthly-amount" type="number" min="1" step="1" value="300">
+                        <input id="dca-monthly-amount" type="number" min="1" step="1" value="1100">
                     </div>
 
                     <div class="kpi-card dca-kpi-card">

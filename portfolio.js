@@ -18,6 +18,11 @@ const PortfolioModule = (() => {
         '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#14b8a6'
     ];
 
+    const DETAIL_PALETTE = [
+        '#10b981', '#60a5fa', '#f97316', '#a78bfa', '#22d3ee',
+        '#f43f5e', '#84cc16', '#f59e0b', '#38bdf8', '#c084fc'
+    ];
+
     let catalog = [];
     let selections = []; // [{ id, weight }]
     let pieChart = null;
@@ -268,7 +273,31 @@ const PortfolioModule = (() => {
             return { date, open: eur, high: eur, low: eur, close: eur, volume: 0 };
         });
 
-        return { rows, baseDate };
+        const detailSeries = etfs.map((x, i) => {
+            const etfName = x.etf?.name || x.etf?.id || `ETF ${i + 1}`;
+            const points = commonDates.map((date) => {
+                return round2(x.map.get(date));
+            });
+            const dataByDate = {};
+            commonDates.forEach((date, idx) => {
+                dataByDate[date] = points[idx];
+            });
+
+            return {
+                label: etfName,
+                data: points,
+                dataByDate,
+                borderColor: DETAIL_PALETTE[i % DETAIL_PALETTE.length],
+                backgroundColor: 'transparent',
+                borderWidth: 1.3,
+                fill: false,
+                tension: 0.25,
+                pointRadius: 0,
+                pointHoverRadius: 3
+            };
+        });
+
+        return { rows, baseDate, detailSeries };
     };
 
     /** Confirme le portefeuille : construit la série et recalcule le dashboard. */
@@ -299,6 +328,10 @@ const PortfolioModule = (() => {
 
         const res = ETFDashboard.applyPortfolioSeries(composite.rows, label);
 
+        if (typeof ChartManager !== 'undefined' && typeof ChartManager.setDetailDatasets === 'function') {
+            ChartManager.setDetailDatasets(composite.detailSeries || []);
+        }
+
         if (res.clamped) {
             showWarning(`⚠️ Certains ETF n'ont pas de données avant le ${formatFr(res.min)}. La période de début a été ajustée.`);
         } else {
@@ -322,10 +355,22 @@ const PortfolioModule = (() => {
     /** Réinitialise sur le portefeuille par défaut (CW8 seul). */
     const resetDefault = () => {
         selections = [];
-        const cw8 = catalog.find((e) => e.id === 'CW8.PA') || catalog[0];
-        if (cw8) {
-            selections.push({ id: cw8.id, weight: 100 });
+
+        const msciWorld = catalog.find((e) => e.id === 'CW8.PA');
+        const msciEmerging = catalog.find((e) => e.id === 'PAEEM.PA');
+        const stoxx600 = catalog.find((e) => e.id === 'ETSZ.DE');
+
+        if (msciWorld && msciEmerging && stoxx600) {
+            selections.push({ id: msciWorld.id, weight: 50 });
+            selections.push({ id: msciEmerging.id, weight: 25 });
+            selections.push({ id: stoxx600.id, weight: 25 });
+        } else {
+            const cw8 = catalog.find((e) => e.id === 'CW8.PA') || catalog[0];
+            if (cw8) {
+                selections.push({ id: cw8.id, weight: 100 });
+            }
         }
+
         render();
     };
 
@@ -357,6 +402,20 @@ const PortfolioModule = (() => {
                 DOM.panel.classList.toggle('collapsed');
                 const collapsed = DOM.panel.classList.contains('collapsed');
                 DOM.toggle.setAttribute('aria-expanded', String(!collapsed));
+            });
+        }
+
+        const detailsToggleBtn = document.getElementById('toggle-etf-details');
+        if (detailsToggleBtn) {
+            detailsToggleBtn.addEventListener('click', () => {
+                if (typeof ChartManager === 'undefined' || typeof ChartManager.toggleDetailDatasets !== 'function') {
+                    return;
+                }
+                const visible = ChartManager.toggleDetailDatasets();
+                detailsToggleBtn.textContent = visible
+                    ? 'Masquer les courbes ETF'
+                    : 'Afficher les courbes ETF';
+                detailsToggleBtn.setAttribute('aria-pressed', String(visible));
             });
         }
         if (DOM.confirm) DOM.confirm.addEventListener('click', confirm);

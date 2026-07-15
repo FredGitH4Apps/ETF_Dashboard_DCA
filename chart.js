@@ -14,6 +14,8 @@ const ChartManager = (() => {
     let xTickLabels = []; // label pré-calculé par point (string | [ligne1, ligne2] | '')
     let yearBoundaryIndices = []; // indices marquant un changement d'année (séparateurs)
     let lastData = []; // dernières données affichées (pour recalcul au redimensionnement)
+    let detailDatasets = []; // courbes ETF individuelles (optionnelles)
+    let detailsVisible = false;
 
     const MONTHS_FULL = [
         'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -134,6 +136,53 @@ const ChartManager = (() => {
     };
 
     /**
+     * Crée le dataset principal (courbe portefeuille globale, toujours dominante).
+     * @param {Array<number>} prices
+     * @returns {Object}
+     */
+    const buildMainDataset = (prices) => ({
+        label: 'Prix de clôture (EUR)',
+        data: prices,
+        borderColor: '#f0b429',
+        backgroundColor: 'rgba(240, 180, 41, 0.05)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#f0b429',
+        pointBorderColor: '#1a1a1a',
+        pointBorderWidth: 2,
+        hoverBackgroundColor: '#f0b429'
+    });
+
+    /**
+     * Compose les datasets visibles : portefeuille global + détails ETF optionnels.
+     * @param {Array<number>} prices
+     * @returns {Array<Object>}
+     */
+    const composeDatasets = (prices) => {
+        const datasets = [buildMainDataset(prices)];
+        if (detailsVisible && detailDatasets.length > 0) {
+            const alignedDetails = detailDatasets.map((dataset) => {
+                // Aligne les points ETF sur les dates réellement affichées dans le graphe.
+                if (dataset && dataset.dataByDate) {
+                    return {
+                        ...dataset,
+                        data: chartDates.map((iso) => {
+                            const v = dataset.dataByDate[iso];
+                            return Number.isFinite(v) ? v : null;
+                        })
+                    };
+                }
+                return dataset;
+            });
+            datasets.push(...alignedDetails);
+        }
+        return datasets;
+    };
+
+    /**
      * Initialise le graphique Chart.js
      * @param {string} canvasId - ID du canvas HTML
      * @returns {Chart} Instance Chart.js
@@ -146,21 +195,7 @@ const ChartManager = (() => {
             plugins: [yearSeparatorPlugin],
             data: {
                 labels: [],
-                datasets: [{
-                    label: 'Prix de clôture (EUR)',
-                    data: [],
-                    borderColor: '#f0b429',
-                    backgroundColor: 'rgba(240, 180, 41, 0.05)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 0,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#f0b429',
-                    pointBorderColor: '#1a1a1a',
-                    pointBorderWidth: 2,
-                    hoverBackgroundColor: '#f0b429'
-                }]
+                datasets: [buildMainDataset([])]
             },
             options: {
                 responsive: true,
@@ -217,7 +252,7 @@ const ChartManager = (() => {
                             },
                             afterLabel: function(context) {
                                 // Affiche la % de variation depuis le début
-                                const firstValue = this.chart.data.datasets[0].data[0];
+                                const firstValue = context.dataset?.data?.[0];
                                 if (firstValue && context.parsed.y !== null) {
                                     const change = ((context.parsed.y - firstValue) / firstValue * 100).toFixed(2);
                                     const sign = change >= 0 ? '+' : '';
@@ -301,7 +336,7 @@ const ChartManager = (() => {
         
         // Met à jour les données du graphique
         chartInstance.data.labels = labels;
-        chartInstance.data.datasets[0].data = prices;
+        chartInstance.data.datasets = composeDatasets(prices);
         
         // Mise à jour automatique de l'échelle Y
         chartInstance.options.scales.y.max = undefined; // Auto-scale
@@ -309,6 +344,38 @@ const ChartManager = (() => {
         
         chartInstance.update();
         console.log(`✓ Graphique mis à jour avec ${data.length} points`);
+    };
+
+    /**
+     * Définit les courbes ETF détaillées (masquées par défaut tant que le toggle est off).
+     * @param {Array<Object>} datasets
+     */
+    const setDetailDatasets = (datasets) => {
+        detailDatasets = Array.isArray(datasets) ? datasets : [];
+        if (detailDatasets.length === 0) {
+            detailsVisible = false;
+        }
+        if (!chartInstance || !lastData || lastData.length === 0) return;
+        chartInstance.data.datasets = composeDatasets(lastData.map((d) => d.close));
+        chartInstance.update();
+    };
+
+    /**
+     * Affiche/masque les courbes ETF détaillées.
+     * @returns {boolean} true si les détails sont visibles après bascule
+     */
+    const toggleDetailDatasets = () => {
+        if (!detailDatasets || detailDatasets.length === 0) {
+            detailsVisible = false;
+            return false;
+        }
+        detailsVisible = !detailsVisible;
+        if (!chartInstance || !lastData || lastData.length === 0) {
+            return detailsVisible;
+        }
+        chartInstance.data.datasets = composeDatasets(lastData.map((d) => d.close));
+        chartInstance.update();
+        return detailsVisible;
     };
     
     /**
@@ -351,6 +418,8 @@ const ChartManager = (() => {
     return {
         initChart,
         updateChart,
+        setDetailDatasets,
+        toggleDetailDatasets,
         updateChartAccessibility,
         destroyChart
     };
