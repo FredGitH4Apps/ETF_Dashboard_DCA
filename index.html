@@ -393,6 +393,9 @@
 
     <div class="app-container">
 
+        <!-- Bouton d'installation PWA (visible sur Android quand disponible) -->
+        <button id="pwa-install-btn" class="pwa-install-btn" hidden>⬇️ Installer l'app</button>
+
         <!-- En-tête -->
         <header class="header">
             <div class="header-content">
@@ -680,6 +683,29 @@
                 });
             });
         }
+
+        // Bouton d'installation PWA (Android/Chrome)
+        (function () {
+            let deferredPrompt = null;
+            const btn = document.getElementById('pwa-install-btn');
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (btn) btn.hidden = false;
+            });
+            if (btn) {
+                btn.addEventListener('click', async () => {
+                    if (!deferredPrompt) return;
+                    deferredPrompt.prompt();
+                    await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    btn.hidden = true;
+                });
+            }
+            window.addEventListener('appinstalled', () => {
+                if (btn) btn.hidden = true;
+            });
+        })();
     </script>
 </body>
 </html>

@@ -13,6 +13,7 @@ const ChartManager = (() => {
     let chartDates = []; // dates ISO alignées sur les points du graphique (pour l'axe X hiérarchique)
     let xTickLabels = []; // label pré-calculé par point (string | [ligne1, ligne2] | '')
     let yearBoundaryIndices = []; // indices marquant un changement d'année (séparateurs)
+    let lastData = []; // dernières données affichées (pour recalcul au redimensionnement)
 
     const MONTHS_FULL = [
         'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -71,23 +72,23 @@ const ChartManager = (() => {
         const spanMonths = (lastDate.getFullYear() - firstDate.getFullYear()) * 12
             + (lastDate.getMonth() - firstDate.getMonth());
 
-        // Choisit la stratégie de densité
-        let monthFilter; // (monthIndex) => bool : quels débuts de mois on étiquette
-        let useFullMonth;
-        if (spanMonths <= 18) {
-            monthFilter = () => true;          // chaque mois
-            useFullMonth = true;               // en toutes lettres
-        } else if (spanMonths <= 36) {
-            monthFilter = () => true;          // chaque mois
-            useFullMonth = false;              // abrégé
-        } else if (spanMonths <= 96) {
-            monthFilter = (m) => m % 3 === 0;  // trimestres
-            useFullMonth = false;
-        } else {
-            monthFilter = (m) => m === 0;      // janvier seulement
-            useFullMonth = false;
-        }
+        // Largeur réelle du graphique -> nombre max de labels (anti-chevauchement)
+        const width = (chartInstance && chartInstance.width) ? chartInstance.width : window.innerWidth;
+        const maxLabels = Math.max(3, Math.floor(width / 62));
 
+        // Stratégie de base selon l'étendue temporelle
+        let monthStep;
+        let useFullMonth;
+        if (spanMonths <= 18) { monthStep = 1; useFullMonth = true; }
+        else if (spanMonths <= 36) { monthStep = 1; useFullMonth = false; }
+        else if (spanMonths <= 96) { monthStep = 3; useFullMonth = false; }
+        else { monthStep = 12; useFullMonth = false; }
+
+        // Sur écran étroit : noms de mois abrégés pour gagner de la place
+        if (width < 700) useFullMonth = false;
+
+        // 1) Collecte des débuts de mois candidats + frontières d'année
+        const candidates = [];
         let prevMonth = null;
         let prevYear = null;
         for (let i = 0; i < data.length; i += 1) {
@@ -95,23 +96,37 @@ const ChartManager = (() => {
             const month = d.getMonth();
             const year = d.getFullYear();
 
-            const isMonthStart = month !== prevMonth || year !== prevYear;
-
             if (year !== prevYear && prevYear !== null) {
                 yearBoundaryIndices.push(i);
             }
 
-            if (isMonthStart && monthFilter(month)) {
-                const name = useFullMonth ? MONTHS_FULL[month] : MONTHS_SHORT[month];
-                // Année sur une 2e ligne au 1er label d'une nouvelle année
-                xTickLabels[i] = (year !== prevYear) ? [name, String(year)] : name;
+            const isMonthStart = month !== prevMonth || year !== prevYear;
+            if (isMonthStart) {
+                const stepOk = (monthStep === 1)
+                    || (monthStep === 3 && month % 3 === 0)
+                    || (monthStep === 12 && month === 0);
+                if (stepOk) candidates.push({ index: i, month, year });
             }
 
             prevMonth = month;
             prevYear = year;
         }
 
-        // Garantit qu'au moins la première année soit visible
+        if (candidates.length === 0) return;
+
+        // 2) Amincissement pour ne jamais dépasser maxLabels
+        const stride = Math.max(1, Math.ceil(candidates.length / maxLabels));
+        const kept = candidates.filter((_, idx) => idx % stride === 0);
+
+        // 3) Attribution des labels (année en 2e ligne au changement d'année)
+        let prevKeptYear = null;
+        for (const c of kept) {
+            const name = useFullMonth ? MONTHS_FULL[c.month] : MONTHS_SHORT[c.month];
+            xTickLabels[c.index] = (c.year !== prevKeptYear) ? [name, String(c.year)] : name;
+            prevKeptYear = c.year;
+        }
+
+        // Garantit un label initial avec l'année
         if (xTickLabels[0] === '') {
             const name0 = useFullMonth ? MONTHS_FULL[firstDate.getMonth()] : MONTHS_SHORT[firstDate.getMonth()];
             xTickLabels[0] = [name0, String(firstDate.getFullYear())];
@@ -150,6 +165,12 @@ const ChartManager = (() => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onResize: (chart) => {
+                    // Recalcule la densité des labels selon la nouvelle largeur (rotation écran)
+                    if (lastData && lastData.length) {
+                        computeXAxis(lastData);
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false
@@ -276,6 +297,7 @@ const ChartManager = (() => {
         const prices = data.map(d => d.close);
         chartDates = data.map(d => d.date); // conserve les dates ISO pour l'axe hiérarchique
         computeXAxis(data); // calcule les labels dynamiques et les séparateurs d'année
+        lastData = data;
         
         // Met à jour les données du graphique
         chartInstance.data.labels = labels;

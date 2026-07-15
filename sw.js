@@ -5,7 +5,7 @@
  * Bump CACHE_VERSION à chaque déploiement pour rafraîchir les fichiers.
  */
 
-const CACHE_VERSION = 'etf-dashboard-v2';
+const CACHE_VERSION = 'etf-dashboard-v3';
 const APP_SHELL = [
     './',
     './index.html',
