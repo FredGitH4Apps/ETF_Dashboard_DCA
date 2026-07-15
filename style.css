@@ -1110,9 +1110,20 @@ select:focus-visible {
         width: 48px;
         min-width: 48px;
         max-width: 48px;
+        overflow: hidden;
+    }
+    /* Bouton compact vertical pleine hauteur quand le volet est replié */
+    .portfolio-panel.collapsed .portfolio-toggle {
+        writing-mode: vertical-rl;
+        height: 100%;
+        justify-content: center;
+        padding: 12px 6px;
     }
     .portfolio-panel.collapsed .portfolio-toggle-text {
-        display: none;
+        display: inline;
+    }
+    .portfolio-panel.collapsed .portfolio-toggle-caret {
+        transform: rotate(90deg);
     }
 
     /* Volet droit (DCA) : sticky + scroll interne */
