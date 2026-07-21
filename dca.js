@@ -416,7 +416,7 @@ const DCAModule = (() => {
      * Initialise le module DCA et ses événements.
      */
     const init = () => {
-        DOM.monthlyAmountInput = document.getElementById('dca-monthly-amount');
+        DOM.monthlyAmountInput = document.getElementById('portfolio-monthly-amount');
         DOM.projectionYearsInput = document.getElementById('dca-projection-years');
         DOM.projectionMonthlyInput = document.getElementById('dca-projection-monthly');
         DOM.projectionRateInput = document.getElementById('dca-projection-rate');

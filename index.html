@@ -490,6 +490,10 @@
                 </button>
                 <div class="portfolio-body" id="portfolio-body">
                     <h2 class="portfolio-title">Éditer le portefeuille</h2>
+                    <div class="portfolio-dca-input">
+                        <label for="portfolio-monthly-amount">Montant mensuel DCA (€)</label>
+                        <input id="portfolio-monthly-amount" type="number" min="1" step="1" value="1100" aria-label="Montant à investir chaque mois en DCA">
+                    </div>
                     <p class="portfolio-hint">Composez jusqu'à 10 ETF. La somme des pourcentages fait toujours 100%.</p>
                     <div id="portfolio-rows" class="portfolio-rows"></div>
                     <div id="portfolio-add" class="portfolio-add"></div>
@@ -568,11 +572,6 @@
                 <section class="dca-section" aria-labelledby="dca-retro-title">
                     <h2 id="dca-retro-title">📊 Rétroviseur</h2>
                     <p class="dca-section-hint">Le rendement DCA est naturellement inférieur au buy-and-hold sur un marché haussier&nbsp;: vos versements sont étalés dans le temps.</p>
-
-                    <div class="dca-input-group">
-                        <label for="dca-monthly-amount">Montant mensuel (€)</label>
-                        <input id="dca-monthly-amount" type="number" min="1" step="1" value="1100">
-                    </div>
 
                     <div class="kpi-card dca-kpi-card">
                         <div class="kpi-label">Total investi</div>

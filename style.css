@@ -545,34 +545,6 @@ select:focus-visible {
     color: var(--accent-primary);
 }
 
-.dca-input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.dca-input-group label {
-    font-size: var(--font-size-base);
-    color: var(--text-secondary);
-    font-weight: 600;
-}
-
-.dca-input-group input {
-    padding: var(--spacing-sm);
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-family: var(--font-family);
-    font-size: var(--font-size-base);
-}
-
-.dca-input-group input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.2);
-}
-
 .dca-kpi-card {
     text-align: left;
     padding: var(--spacing-sm);
@@ -797,6 +769,35 @@ select:focus-visible {
     font-size: 12px;
     color: var(--text-muted);
     line-height: 1.4;
+}
+
+.portfolio-dca-input {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+.portfolio-dca-input label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.portfolio-dca-input input {
+    padding: 8px;
+    font-size: 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+}
+.portfolio-dca-input input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
 
 .portfolio-rows {

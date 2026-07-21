@@ -11,7 +11,6 @@
 
 const PortfolioModule = (() => {
     const MAX_ETFS = 10;
-    const START_CAPITAL = 1000; // capital de départ (€) réparti selon les %
 
     const PALETTE = [
         '#f0b429', '#10b981', '#6366f1', '#ef4444', '#8b5cf6',
@@ -232,11 +231,33 @@ const PortfolioModule = (() => {
     };
 
     /**
-     * Construit la série composite (capital de départ en €) sur l'intersection
-     * des dates des ETF sélectionnés.
-     * @returns {{rows: Array, baseDate: string} | null}
+     * Extrait les dates mensuelles (premier jour du mois ou premier jour disponible) depuis une liste de dates.
      */
-    const buildComposite = () => {
+    const getMonthlyDates = (allDates) => {
+        if (!allDates || allDates.length === 0) return [];
+        
+        const monthly = [];
+        let lastMonth = null;
+        
+        for (const dateStr of allDates) {
+            const [year, month] = dateStr.substring(0, 7).split('-');
+            const monthKey = `${year}-${month}`;
+            if (monthKey !== lastMonth) {
+                monthly.push(dateStr);
+                lastMonth = monthKey;
+            }
+        }
+        
+        return monthly;
+    };
+
+    /**
+     * Construit la série composite DCA mensuel pondéré.
+     * Pour chaque mois : investit (monthlyAmount * weight%) à chaque ETF
+     * Accumule les parts au fil du temps
+     * Valorise la position chaque jour
+     */
+    const buildMonthlyDCASeries = (monthlyAmount) => {
         if (selections.length === 0) return null;
 
         const etfs = selections.map((s) => ({
@@ -255,33 +276,61 @@ const PortfolioModule = (() => {
             x.map = new Map(x.etf.data.map((d) => [d.date, d.close]));
         });
 
-        // Intersection des dates (présentes dans TOUS les ETF sélectionnés)
+        // Intersection des dates
         const first = etfs[0].etf.data.map((d) => d.date);
         const commonDates = first.filter((date) => etfs.every((x) => x.map.has(date)));
         commonDates.sort();
+        
         if (commonDates.length === 0) return null;
 
         const baseDate = commonDates[0];
-        etfs.forEach((x) => { x.base = x.map.get(baseDate); });
+        
+        // Extraire les dates mensuelles
+        const monthlyDates = getMonthlyDates(commonDates);
+        if (monthlyDates.length === 0) return null;
 
+        // Initialiser l'accumulateur de parts pour chaque ETF
+        etfs.forEach((x) => {
+            x.accumulatedShares = 0;
+        });
+
+        // Construire la série DCA : pour chaque date, accumuler les parts puis valoriser
         const rows = commonDates.map((date) => {
-            let value = 0;
-            for (const x of etfs) {
-                value += x.w * (x.map.get(date) / x.base);
+            // Vérifier si c'est une date d'investissement mensuel
+            if (monthlyDates.includes(date)) {
+                // Investir monthlyAmount * weight% dans chaque ETF
+                for (const x of etfs) {
+                    const amountForEtf = (monthlyAmount * x.w);
+                    const priceAtDate = x.map.get(date);
+                    if (priceAtDate > 0) {
+                        x.accumulatedShares += amountForEtf / priceAtDate;
+                    }
+                }
             }
-            const eur = round2(START_CAPITAL * value);
+
+            // Valoriser le portefeuille à cette date
+            let totalValue = 0;
+            for (const x of etfs) {
+                const priceAtDate = x.map.get(date);
+                totalValue += x.accumulatedShares * priceAtDate;
+            }
+
+            const eur = round2(totalValue);
             return { date, open: eur, high: eur, low: eur, close: eur, volume: 0 };
         });
 
+        // Construire les séries détaillées (contribution de chaque ETF)
         const detailSeries = etfs.map((x, i) => {
             const etfName = x.etf?.name || x.etf?.id || `ETF ${i + 1}`;
-            const points = commonDates.map((date) => {
-                return round2(x.map.get(date));
-            });
             const dataByDate = {};
-            commonDates.forEach((date, idx) => {
-                dataByDate[date] = points[idx];
+            
+            commonDates.forEach((date) => {
+                const priceAtDate = x.map.get(date);
+                const etfValue = round2(x.accumulatedShares * priceAtDate);
+                dataByDate[date] = etfValue;
             });
+
+            const points = commonDates.map((date) => dataByDate[date]);
 
             return {
                 label: etfName,
@@ -298,6 +347,19 @@ const PortfolioModule = (() => {
         });
 
         return { rows, baseDate, detailSeries };
+    };
+
+    /**
+     * Construit la série composite (capital de départ en €) sur l'intersection
+     * des dates des ETF sélectionnés.
+     * @returns {{rows: Array, baseDate: string} | null}
+     */
+    const buildComposite = () => {
+        // Lire le montant mensuel depuis l'input
+        const monthlyAmountInput = document.getElementById('portfolio-monthly-amount');
+        const monthlyAmount = monthlyAmountInput ? parseFloat(monthlyAmountInput.value) || 1100 : 1100;
+        
+        return buildMonthlyDCASeries(monthlyAmount);
     };
 
     /** Confirme le portefeuille : construit la série et recalcule le dashboard. */
